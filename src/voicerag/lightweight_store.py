@@ -60,7 +60,8 @@ class LightweightVectorStore:
 
     def search(self, query: str, top_k_dense: int = 8, top_k_sparse: int = 8,
                top_k_final: int = 5, rrf_k: int = 60,
-               strategy_filter: str | None = None) -> tuple[list[RetrievedChunk], float]:
+               strategy_filter: str | None = None,
+               language_filter: str | None = None) -> tuple[list[RetrievedChunk], float]:
         t0 = time.perf_counter()
 
         # Dense retrieval: cosine similarity via dot product
@@ -89,6 +90,8 @@ class LightweightVectorStore:
         for idx, fused_score in candidates:
             chunk = self.chunks[idx]
             if strategy_filter and chunk.strategy != strategy_filter:
+                continue
+            if language_filter and chunk.metadata.get("language") != language_filter:
                 continue
             d_score = float(dense_scores[idx])
             s_score = float(bm25_scores_all[idx])

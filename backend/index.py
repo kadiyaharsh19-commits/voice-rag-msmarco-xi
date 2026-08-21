@@ -198,6 +198,13 @@ class QueryRequest(BaseModel):
     language: Optional[str] = "en"
 
 
+def _dataset_language(language: str | None) -> str | None:
+    """Convert browser locale values to MSMARCO-XI language configs."""
+    if not language:
+        return None
+    return language.split("-", 1)[0].lower()
+
+
 class HealthResponse(BaseModel):
     status: str
     chunks_indexed: int = 0
@@ -273,7 +280,11 @@ async def query(req: QueryRequest):
                 "total_latency_ms": 0,
             }
 
-        resp = p.ask_text(req.text.strip())
+        language = _dataset_language(req.language)
+        # The bundled pilot predates language metadata; leave English queries
+        # compatible with it while Hindi queries require Hindi-indexed vectors.
+        language_filter = language if language != "en" else None
+        resp = p.ask_text(req.text.strip(), language=language_filter)
         return resp.model_dump()
     except Exception as e:
         import traceback

@@ -63,8 +63,8 @@ class VoiceRAGHarness:
         self.grounding_guardrail = GroundingGuardrail(cfg.guardrails)
 
     # ---- entry points ----
-    def run_text(self, query: str) -> PipelineResponse:
-        return self._run(query)
+    def run_text(self, query: str, language: str | None = None) -> PipelineResponse:
+        return self._run(query, language=language)
 
     def run_audio(self, audio_bytes: bytes) -> PipelineResponse:
         timings: list[StageTiming] = []
@@ -83,7 +83,8 @@ class VoiceRAGHarness:
         return response
 
     # ---- core pipeline ----
-    def _run(self, query: str, extra_timings: list[StageTiming] | None = None) -> PipelineResponse:
+    def _run(self, query: str, extra_timings: list[StageTiming] | None = None,
+             language: str | None = None) -> PipelineResponse:
         timings: list[StageTiming] = list(extra_timings or [])
         verdicts: list[GuardrailVerdict] = []
         h = self.cfg.harness
@@ -101,7 +102,7 @@ class VoiceRAGHarness:
 
         # 2. retrieval (chunking already done at index-build time; this is
         #    the query-time chunk + vector DB retrieval the latency budget targets)
-        retrieved, retrieval_err = self._retrieve_with_retries(query, h)
+        retrieved, retrieval_err = self._retrieve_with_retries(query, h, language)
         timings.append(retrieval_err)
         if retrieved is None:
             return PipelineResponse(query=query, status="error",
@@ -151,7 +152,7 @@ class VoiceRAGHarness:
                                  timings=timings,
                                  total_latency_ms=sum(t.latency_ms for t in timings))
 
-    def _retrieve_with_retries(self, query: str, h) -> tuple[list[RetrievedChunk] | None, StageTiming]:
+    def _retrieve_with_retries(self, query: str, h, language: str | None = None) -> tuple[list[RetrievedChunk] | None, StageTiming]:
         r = self.cfg.retrieval
         box: dict = {}
 
@@ -159,6 +160,7 @@ class VoiceRAGHarness:
             results, latency_ms = self.store.search(
                 query, top_k_dense=r.top_k_dense, top_k_sparse=r.top_k_sparse,
                 top_k_final=r.top_k_final, rrf_k=r.rrf_k,
+                language_filter=language,
             )
             box["inner_latency_ms"] = latency_ms
             return results

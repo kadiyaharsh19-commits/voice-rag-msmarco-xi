@@ -53,9 +53,9 @@ class VoiceRAGPipeline:
         self.harness = VoiceRAGHarness(self.cfg, stt, store, generator)
         return self
 
-    def ask_text(self, query: str) -> PipelineResponse:
+    def ask_text(self, query: str, language: str | None = None) -> PipelineResponse:
         assert self.harness is not None, "call build_index() first"
-        return self.harness.run_text(query)
+        return self.harness.run_text(query, language=language)
 
     def ask_audio(self, audio_bytes: bytes) -> PipelineResponse:
         assert self.harness is not None, "call build_index() first"

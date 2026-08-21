@@ -120,6 +120,9 @@ class PineconeVectorStore:
                         "text": chunk.text,
                         "strategy": chunk.strategy,
                         "token_count": len(chunk.text.split()),
+                        "language": chunk.metadata.get("language", ""),
+                        "target_lang": chunk.metadata.get("target_lang", ""),
+                        "query_id": str(chunk.metadata.get("query_id", "")),
                         "title": chunk.metadata.get("title", ""),
                         "url": chunk.metadata.get("url", ""),
                     },
@@ -153,6 +156,7 @@ class PineconeVectorStore:
         top_k_final: int = 5,
         rrf_k: int = 60,
         strategy_filter: str | None = None,
+        language_filter: str | None = None,
     ) -> Tuple[List[RetrievedChunk], float]:
         """Search Pinecone for dense matches and fuse with BM25."""
         t0 = time.perf_counter()
@@ -165,12 +169,14 @@ class PineconeVectorStore:
 
         # Query Pinecone REST API
         endpoint = f"{self._host}/query"
+        query_filter = {"language": language_filter} if language_filter else None
         body = _json.dumps({
             "vector": q_vec_list,
             "topK": top_k_dense,
             "includeMetadata": True,
             "includeValues": False,
             "namespace": self.cfg.namespace,
+            **({"filter": query_filter} if query_filter else {}),
         }).encode("utf-8")
 
         req = urllib.request.Request(
@@ -201,7 +207,13 @@ class PineconeVectorStore:
                 doc_id=meta.get("doc_id", "doc_0"),
                 text=meta.get("text", ""),
                 strategy=meta.get("strategy", "fixed"),
-                metadata={"title": meta.get("title", ""), "url": meta.get("url", "")},
+                metadata={
+                    "title": meta.get("title", ""),
+                    "url": meta.get("url", ""),
+                    "language": meta.get("language", ""),
+                    "target_lang": meta.get("target_lang", ""),
+                    "query_id": meta.get("query_id", ""),
+                },
             )
             dense_score = float(match.get("score", 0.0))
             fused_score = 1.0 / (rrf_k + rank + 1)
