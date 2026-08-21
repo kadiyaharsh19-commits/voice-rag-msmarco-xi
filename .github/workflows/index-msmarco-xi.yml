@@ -48,6 +48,7 @@ jobs:
         env:
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
           PINECONE_HOST: ${{ secrets.PINECONE_HOST }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PINECONE_INDEX_NAME: ${{ inputs.index_name }}
           PINECONE_NAMESPACE: ${{ inputs.namespace }}
           HF_DATASET_CONFIG: ${{ inputs.language }}

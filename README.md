@@ -103,6 +103,7 @@ workflow at `.github/workflows/index-msmarco-xi.yml`:
 2. In GitHub, open **Settings -> Secrets and variables -> Actions**.
 3. Add the secret `PINECONE_API_KEY` with your replacement Pinecone key.
   Add `PINECONE_HOST` with the host shown by the new Pinecone index.
+  Add `HF_TOKEN` from your Hugging Face account for higher-rate dataset streaming.
 4. Open **Actions -> Index MSMARCO-XI in Pinecone -> Run workflow**.
 5. Choose a language such as `hi` and start with a row limit of `1000`; increase it after the pilot succeeds.
 
