@@ -19,11 +19,14 @@ def main():
     language = os.environ.get("HF_DATASET_CONFIG", "hi")
     split = os.environ.get("HF_DATASET_SPLIT", "train")
     row_limit = int(os.environ.get("HF_DATASET_LIMIT", "200")) or None
+    strict_dataset = os.environ.get("MSMARCO_XI_STRICT", "").lower() in {"1", "true", "yes"}
     print(f"Dataset: MSMARCO-XI/{language} ({split}), rows: {row_limit or 'all'}")
+    print(f"Dataset fallback: {'disabled' if strict_dataset else 'enabled'}")
 
     print("Loading documents...")
     rows = load_msmarco_xi(split=split, language=language, limit=row_limit,
                             streaming=True)
+    print(f"Loaded {len(rows)} dataset rows ({sum(bool(row.get('passage')) for row in rows)} passages)")
     docs = rows_to_documents(rows)
     corpus_texts = [d[1] for d in docs]
     

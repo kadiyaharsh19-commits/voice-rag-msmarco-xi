@@ -65,6 +65,7 @@ pip install -r requirements.txt
 export SARVAM_API_KEY=...        # or ELEVENLABS_API_KEY + STT_PROVIDER=elevenlabs
 set HF_DATASET_CONFIG=hi         # choose: hi, bn, ta, te, kn, ...
 set HF_DATASET_LIMIT=2000        # rows to index; 0 means all rows
+set MSMARCO_XI_STRICT=1          # fail instead of silently using the dev sample
 python scripts/build_index.py
 python scripts/latency_bench.py --n 300
 python scripts/test_all.py
@@ -85,6 +86,7 @@ set PINECONE_INDEX_NAME=voicerag-index
 set HF_DATASET_CONFIG=hi
 set HF_DATASET_SPLIT=train
 set HF_DATASET_LIMIT=10000
+set MSMARCO_XI_STRICT=1
 python scripts/index_to_pinecone.py
 ```
 

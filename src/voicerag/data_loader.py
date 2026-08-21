@@ -53,6 +53,7 @@ def _flatten_row(row: dict, language: str) -> list[dict]:
         return [row]
 
     translated = passages.get("Translated_passages") or []
+    english = passages.get("English_passages") or []
     selected = passages.get("is_selected") or []
     flattened = []
     for index, text in enumerate(translated):
@@ -61,9 +62,15 @@ def _flatten_row(row: dict, language: str) -> list[dict]:
         flattened.append({
             "passage_id": f"{row.get('query_id', 'query')}-{index}",
             "query_id": row.get("query_id"),
+            "query": row.get("query", ""),
             "passage": text,
+            "english_passage": english[index] if index < len(english) else "",
             "language": language,
             "is_selected": selected[index] if index < len(selected) else None,
+            "query_type": row.get("query_type"),
+            "answer": row.get("Answer", row.get("answer", "")),
+            "source_lang": row.get("source_lang", "eng_Latn"),
+            "target_lang": row.get("target_lang", LANGUAGE_CONFIGS.get(language, language)),
             "title": "",
             "url": "",
         })
@@ -72,6 +79,12 @@ def _flatten_row(row: dict, language: str) -> list[dict]:
 
 def load_msmarco_xi(split: str = "train", limit: int | None = None,
                     language: str = "hi", streaming: bool = True) -> list[dict]:
+    """Load translated MSMARCO-XI passages for one language configuration.
+
+    The sample fallback is useful for local development, but production/index
+    jobs can set ``MSMARCO_XI_STRICT=1`` to fail loudly when Hugging Face is
+    unavailable instead of building an index from the sample corpus.
+    """
     try:
         from datasets import load_dataset  # type: ignore
         ds = load_dataset("ai4bharat/MSMARCO-XI", language, split=split,
@@ -83,8 +96,16 @@ def load_msmarco_xi(split: str = "train", limit: int | None = None,
             row_count += 1
             if limit is not None and row_count >= limit:
                 break
+        if not flattened:
+            raise RuntimeError(
+                f"MSMARCO-XI/{language} returned no translated passages for split {split!r}"
+            )
         return flattened
-    except Exception:
+    except Exception as error:
+        if os.environ.get("MSMARCO_XI_STRICT", "").lower() in {"1", "true", "yes"}:
+            raise RuntimeError(
+                f"Unable to load ai4bharat/MSMARCO-XI/{language} ({split})"
+            ) from error
         rows = []
         # Try multiple possible locations for the sample file
         sample_paths = [
@@ -146,8 +167,14 @@ def rows_to_documents(rows: list[dict]) -> list[tuple[str, str, dict]]:
         text = r.get("passage") or r.get("text") or ""
         metadata = {
             "query_id": r.get("query_id"),
+            "query": r.get("query"),
             "language": r.get("language", "hi"),
+            "target_lang": r.get("target_lang"),
+            "source_lang": r.get("source_lang"),
+            "query_type": r.get("query_type"),
             "is_selected": r.get("is_selected"),
+            "answer": r.get("answer"),
+            "english_passage": r.get("english_passage"),
             "url": r.get("url"),
             "title": r.get("title"),
         }
