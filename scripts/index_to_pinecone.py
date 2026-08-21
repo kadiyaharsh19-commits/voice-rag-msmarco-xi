@@ -21,6 +21,7 @@ if _env_file.exists():
 
 from voicerag.config import PipelineConfig, PineconeConfig
 from voicerag.data_loader import rows_to_documents, stream_msmarco_xi
+from voicerag.sample_data import EMBEDDED_SAMPLE_DATA
 from voicerag.chunking import ChunkingPipeline
 from voicerag.embeddings import get_lightweight_embedder
 from voicerag.pinecone_store import PineconeVectorStore
@@ -41,12 +42,20 @@ def main():
     language = os.environ.get("HF_DATASET_CONFIG", "hi")
     split = os.environ.get("HF_DATASET_SPLIT", "train")
     row_limit = int(os.environ.get("HF_DATASET_LIMIT", "0")) or None
+    source = os.environ.get("INDEX_SOURCE", "huggingface").lower()
     batch_rows = int(os.environ.get("HF_DATASET_BATCH_ROWS", "100"))
     if batch_rows < 1:
         print("[ERROR] HF_DATASET_BATCH_ROWS must be at least 1.")
         sys.exit(1)
-    print(f"[*] Streaming MSMARCO-XI/{language} ({split}) from Hugging Face...")
-    rows = stream_msmarco_xi(split=split, language=language, limit=row_limit)
+    if source == "sample":
+        print("[*] Using bundled offline sample corpus for a deterministic pilot...")
+        rows = iter(EMBEDDED_SAMPLE_DATA[:row_limit] if row_limit else EMBEDDED_SAMPLE_DATA)
+    elif source == "huggingface":
+        print(f"[*] Streaming MSMARCO-XI/{language} ({split}) from Hugging Face...")
+        rows = stream_msmarco_xi(split=split, language=language, limit=row_limit)
+    else:
+        print("[ERROR] INDEX_SOURCE must be 'sample' or 'huggingface'.")
+        sys.exit(1)
 
     print("[*] Initializing lightweight embedder...")
     embedder = get_lightweight_embedder()

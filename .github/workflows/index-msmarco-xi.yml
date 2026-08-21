@@ -23,6 +23,10 @@ on:
         description: Dataset rows processed per batch
         required: true
         default: '25'
+      source:
+        description: Index source; sample is reliable for the demo pilot
+        required: true
+        default: sample
 
 jobs:
   index:
@@ -50,5 +54,6 @@ jobs:
           HF_DATASET_SPLIT: train
           HF_DATASET_LIMIT: ${{ inputs.limit }}
           HF_DATASET_BATCH_ROWS: ${{ inputs.batch_rows }}
+          INDEX_SOURCE: ${{ inputs.source }}
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/index_to_pinecone.py
