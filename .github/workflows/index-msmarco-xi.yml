@@ -24,9 +24,9 @@ on:
         required: true
         default: '25'
       source:
-        description: Index source; sample is reliable for the demo pilot
+        description: Index source; huggingface streams the real MSMARCO-XI dataset
         required: true
-        default: sample
+        default: huggingface
 
 jobs:
   index:
