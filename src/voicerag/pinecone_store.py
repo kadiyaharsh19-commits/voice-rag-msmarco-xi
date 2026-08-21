@@ -119,7 +119,7 @@ class PineconeVectorStore:
                         "doc_id": chunk.doc_id,
                         "text": chunk.text,
                         "strategy": chunk.strategy,
-                        "token_count": chunk.token_count,
+                        "token_count": len(chunk.text.split()),
                         "title": chunk.metadata.get("title", ""),
                         "url": chunk.metadata.get("url", ""),
                     },
@@ -201,7 +201,6 @@ class PineconeVectorStore:
                 doc_id=meta.get("doc_id", "doc_0"),
                 text=meta.get("text", ""),
                 strategy=meta.get("strategy", "fixed"),
-                token_count=meta.get("token_count", len(meta.get("text", "").split())),
                 metadata={"title": meta.get("title", ""), "url": meta.get("url", "")},
             )
             dense_score = float(match.get("score", 0.0))
