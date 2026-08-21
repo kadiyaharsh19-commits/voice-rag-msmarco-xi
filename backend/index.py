@@ -100,6 +100,7 @@ def _get_pipeline():
             from voicerag.harness import VoiceRAGHarness
             from voicerag.lightweight_store import LightweightVectorStore
             from voicerag.sample_data import EMBEDDED_SAMPLE_DATA
+            from voicerag.hindi_sample_data import HINDI_SAMPLE_DATA
             from voicerag.data_loader import rows_to_documents
             from voicerag.chunking import ChunkingPipeline
 
@@ -173,16 +174,40 @@ def _get_pipeline():
             stt = build_stt(cfg.stt)
             harness = VoiceRAGHarness(cfg, stt, store, generator)
 
+            # Keep the demo bilingual while a language-specific Pinecone
+            # namespace is being populated. Production Hindi vectors win
+            # whenever they are available; this is only a small local pilot.
+            hindi_docs = rows_to_documents(HINDI_SAMPLE_DATA)
+            hindi_embedder = get_lightweight_embedder(
+                corpus_for_idf=[document[1] for document in hindi_docs]
+            )
+            hindi_chunker = ChunkingPipeline(
+                embedder=hindi_embedder,
+                strategies=cfg.chunking.strategies,
+                fixed_size=cfg.chunking.fixed_chunk_size_tokens,
+                fixed_overlap=cfg.chunking.fixed_chunk_overlap_tokens,
+                sw_window=cfg.chunking.sentence_window_size,
+                sw_overlap=cfg.chunking.sentence_window_overlap,
+                semantic_threshold=cfg.chunking.semantic_similarity_drop_threshold,
+            )
+            hindi_store = LightweightVectorStore(hindi_embedder)
+            hindi_store.build(hindi_chunker.run_corpus(hindi_docs))
+            hindi_harness = VoiceRAGHarness(cfg, stt, hindi_store, generator)
+
             class Pipeline:
-                def __init__(self, harness, store, cfg):
+                def __init__(self, harness, hindi_harness, store, cfg):
                     self.harness = harness
+                    self.hindi_harness = hindi_harness
                     self.store = store
                     self.cfg = cfg
 
                 def ask_text(self, query, language=None):
-                    return self.harness.run_text(query, language=language)
+                    response = self.harness.run_text(query, language=language)
+                    if language == "hi" and response.status == "refused_off_topic":
+                        return self.hindi_harness.run_text(query, language="hi")
+                    return response
 
-            _pipeline = Pipeline(harness, store, cfg)
+            _pipeline = Pipeline(harness, hindi_harness, store, cfg)
             _pipeline_error = None
             return _pipeline
         except Exception as e:
