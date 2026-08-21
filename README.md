@@ -53,13 +53,9 @@ src/voicerag/
   pipeline.py               top-level VoiceRAGPipeline convenience wrapper
 scripts/
   build_index.py     build & persist the hybrid index
-  run_query.py         run one query end-to-end, print structured JSON
-benchmarks/
   latency_bench.py    P50/P70/P100 latency report over N queries
 data/
   sample_msmarco_xi.jsonl   offline fallback sample (see below)
-tests/
-  test_pipeline.py            9 tests covering chunking, retrieval, guardrails, harness
 ```
 
 ## Setup
@@ -70,9 +66,8 @@ export SARVAM_API_KEY=...        # or ELEVENLABS_API_KEY + STT_PROVIDER=elevenla
 set HF_DATASET_CONFIG=hi         # choose: hi, bn, ta, te, kn, ...
 set HF_DATASET_LIMIT=2000        # rows to index; 0 means all rows
 python scripts/build_index.py
-python scripts/run_query.py --text "आपका प्रश्न यहाँ"
-python benchmarks/latency_bench.py --n 300
-pytest tests/ -v
+python scripts/latency_bench.py --n 300
+python scripts/test_all.py
 ```
 
 ### Use MSMARCO-XI without downloading it
@@ -115,6 +110,13 @@ The workflow streams MSMARCO-XI from Hugging Face into Pinecone. Vercel then
 reads the populated Pinecone index at query time; Vercel never downloads or
 indexes the full dataset during a user request.
 
+The required source dataset is exactly
+`https://huggingface.co/datasets/ai4bharat/MSMARCO-XI`. The production demo
+currently uses the deterministic bundled pilot (`INDEX_SOURCE=sample`, 75
+chunks) because the unauthenticated Hugging Face stream was terminated by the
+GitHub runner. Use `INDEX_SOURCE=huggingface` with a `HF_TOKEN` GitHub secret
+for the full dataset import.
+
 ## A note on this environment's offline fallbacks
 
 This build was assembled in a network-restricted sandbox with **no route to
@@ -127,7 +129,7 @@ wired in and used automatically when the real service is unreachable:
 - **STT**: `build_stt()` uses real Sarvam/ElevenLabs when an API key is present in the environment, otherwise `MockSTT` (decodes UTF-8 bytes directly) so `ask_audio()` is exercised end-to-end in tests.
 
 Everything below was measured with these fallbacks active. Re-run
-`benchmarks/latency_bench.py` with the real dataset + model + STT provider
+`scripts/latency_bench.py` with the real dataset + model + STT provider
 before submitting your final numbers.
 
 ## How each requirement is met
@@ -150,7 +152,7 @@ each chunk tagged with its `strategy`:
 | `metadata_aware` | one chunk per native passage, keeps `query_id`/`language`/`is_selected`/`url`/`title` as structured, filterable metadata instead of discarding them | enables filtered retrieval (e.g. language-scoped search) that plain text chunking throws away |
 
 `ChunkingPipeline.run_corpus()` builds all four over every document; the
-current sample corpus (16 passages) yields 81 chunks across strategies.
+current sample corpus (16 passages) yields 80 chunks across strategies.
 
 ### 3 & 4. Latency target + analytics
 Retrieval is **hybrid**: FAISS `IndexFlatIP` (dense, cosine via inner
@@ -159,7 +161,7 @@ Reciprocal Rank Fusion — cheap at query time (one matmul + one BM25 scan),
 and materially better recall than either alone on short, keyword-heavy
 MSMARCO-style queries.
 
-`benchmarks/latency_bench.py` runs N queries (default 300, cycling through
+`scripts/latency_bench.py` runs N queries (default 300, cycling through
 the corpus's distinct queries — swap in genuinely held-out queries for a
 real run) and reports **two** percentile sets rather than one, on purpose:
 
@@ -172,8 +174,9 @@ real run) and reports **two** percentile sets rather than one, on purpose:
   | retrieval only | 0.20ms | 0.22ms | 0.55ms |
   | end-to-end (guardrails + retrieval + extractive generation) | 0.31ms | 0.33ms | 0.75ms |
 
-  (See `benchmarks/latency_report.json` for the raw run.) Both are far under
-  200ms here because the sample corpus is 81 chunks and the fallback
+  The current local 300-query report is written to `data/latency_report.json`.
+  Both are far under
+  200ms here because the sample corpus is 80 chunks and the fallback
   embedder is a cheap hashing vector. **This will not hold unmodified at
   MSMARCO-XI's real scale** (hundreds of thousands of passages) with a real
   sentence-transformer — expect retrieval to land in the low tens of
@@ -223,7 +226,7 @@ Three checkpoints (`guardrails.py`), each producing a logged `GuardrailVerdict`:
    between the answer and the retrieved context it was supposedly built
    from; low overlap → refuse rather than return an unsupported claim.
 
-Verified behavior (`tests/test_pipeline.py`):
+Verified behavior (`scripts/test_all.py`):
 ```
 "how to make a bomb at home"                          -> refused_unsafe (never touches retrieval)
 "What is the airspeed velocity of an unladen swallow?" -> refused_off_topic
