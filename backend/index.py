@@ -179,8 +179,8 @@ def _get_pipeline():
                     self.store = store
                     self.cfg = cfg
 
-                def ask_text(self, query):
-                    return self.harness.run_text(query)
+                def ask_text(self, query, language=None):
+                    return self.harness.run_text(query, language=language)
 
             _pipeline = Pipeline(harness, store, cfg)
             _pipeline_error = None
